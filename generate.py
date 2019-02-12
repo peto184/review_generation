@@ -21,6 +21,9 @@ parser.add_argument('--temperature', type=float, default=1.0,
                     help='temperature - higher will increase diversity')
 parser.add_argument('--log-interval', type=int, default=100,
                     help='reporting interval')
+parser.add_argument('--type', type=str, default='word',
+                    help='Whether to use character or word level embedding. (word|char)')
+                    
 args = parser.parse_args()
 
 # Set the random seed manually for reproducibility.
@@ -44,12 +47,16 @@ with open(args.outf, 'w') as outf:
     with torch.no_grad():  # no tracking history
         for i in range(args.words):
             output, hidden = model(input, hidden)
-            word_weights = output.squeeze().div(args.temperature).exp().cpu()
-            word_idx = torch.multinomial(word_weights, 1)[0]
-            input.fill_(word_idx)
-            word = corpus.dictionary.idx2word[word_idx]
+            element_weights = output.squeeze().div(args.temperature).exp().cpu()
+            element_idx = torch.multinomial(element_weights, 1)[0]
+            input.fill_(element_idx)
+            word = corpus.dictionary.idx2element[element_idx]
+            
+            if args.type == 'word':
+                outf.write(word + ('\n' if i % 20 == 19 else ' '))
+            else :
+                outf.write(word + ('\n' if i % 80 == 79 else ''))
 
-            outf.write(word + ('\n' if i % 20 == 19 else ' '))
 
             if i % args.log_interval == 0:
                 print('| Generated {}/{} words'.format(i, args.words))

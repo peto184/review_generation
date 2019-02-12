@@ -1,4 +1,3 @@
-import nltk
 import pandas as pd
 import numpy as np
 import data
@@ -9,11 +8,14 @@ from util import load_data, batchify
 from train import train
 from model import RNNModel
 
-parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 RNN/LSTM Language Model')
+parser = argparse.ArgumentParser(description='PyTorch implementation of text generation with LSTM')
 parser.add_argument('--data', type=str, default='./data/',
                     help='location of the data corpus')
 parser.add_argument('--model', type=str, default='LSTM',
                     help='type of recurrent net (RNN_TANH, RNN_RELU, LSTM, GRU)')
+parser.add_argument('--type', type=str, default='word',
+                    help='Whether to use character or word level embedding. (word|char)')
+
 parser.add_argument('--emsize', type=int, default=200,
                     help='size of word embeddings')
 parser.add_argument('--nhid', type=int, default=200,
@@ -34,6 +36,7 @@ parser.add_argument('--dropout', type=float, default=0.2,
                     help='dropout applied to layers (0 = no dropout)')
 parser.add_argument('--tied', action='store_true',
                     help='tie the word embedding and softmax weights')
+
 parser.add_argument('--seed', type=int, default=1111,
                     help='random seed')
 parser.add_argument('--cuda', action='store_true',
@@ -49,7 +52,9 @@ args = parser.parse_args()
 # Load Data
 
 device = torch.device("cuda" if args.cuda else "cpu")
+print(f"Using {device} to train.")
 corpus = data.Corpus(args)
+print(corpus.describe())
 ntokens = len(corpus.dictionary)
 model = RNNModel(ntokens, args.emsize, args.nhid, args.nlayers, dropout=args.dropout).to(device)
 criterion = torch.nn.CrossEntropyLoss()
