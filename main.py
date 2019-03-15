@@ -53,7 +53,10 @@ args = parser.parse_args()
 
 device = torch.device("cuda" if args.cuda else "cpu")
 print(f"Using {device} to train.")
+
+print('Loading corpus.')
 corpus = data.Corpus(args)
+
 print(corpus.describe())
 ntokens = len(corpus.dictionary)
 model = RNNModel(ntokens, args.emsize, args.nhid, args.nlayers, dropout=args.dropout).to(device)

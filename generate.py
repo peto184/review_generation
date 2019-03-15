@@ -7,7 +7,7 @@ parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 Language Model'
 # Model parameters.
 parser.add_argument('--data', type=str, default='./data/',
                     help='location of the data corpus')
-parser.add_argument('--checkpoint', type=str, default='./output/model.pt',
+parser.add_argument('--checkpoint', type=str, default='./models/m_char_10.pkl',
                     help='model checkpoint to use')
 parser.add_argument('--outf', type=str, default='./output/generated.txt',
                     help='output file for generated text')
@@ -33,13 +33,17 @@ device = torch.device("cuda" if args.cuda else "cpu")
 if args.temperature < 1e-3:
     parser.error("--temperature has to be greater or equal 1e-3")
 
+print(f'Loading model {args.checkpoint}')
 with open(args.checkpoint, 'rb') as f:
     model = torch.load(f).to(device)
-
 model.eval()
+
+print(f'Loading the dataset')
 corpus = data.Corpus(args)
 ntokens = len(corpus.dictionary)
 hidden = model.init_hidden(1)
+
+print(corpus.describe())
 
 input = torch.randint(ntokens, (1, 1), dtype=torch.long).to(device)
 

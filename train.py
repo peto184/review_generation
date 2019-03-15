@@ -1,22 +1,45 @@
 import torch
 import time
 import math
+import os
 
 from evaluate import evaluate
+from inference import inference
 from util import get_batch, batchify, repackage_hidden
 
+import tensorflow as tf
+import numpy as np
+
+_time = time.strftime('%Y_%m_%d__%H:%M:%S')
+LOG_FOLDER = f'./log/{_time}'
+summary_writer = tf.summary.FileWriter(LOG_FOLDER)  
+
+def inject_summary(summary_writer, tag, value, step):
+    summary = tf.Summary(
+        value=[tf.Summary.Value(tag=tag, simple_value=value)])
+    summary_writer.add_summary(summary, global_step=step)
+
+def inject_summary_text(summary_writer, tag, value, step):
+    t = tf.constant([value])
+    summary = tf.summary.text(tag, t)
+
+    with tf.Session() as sess:
+        s = sess.run(summary)
+        summary_writer.add_summary(s)
+
+
 def _train_epoch(args, epoch, model, train_data, corpus, device, lr, criterion):
-
-    # Turn on training mode which enables dropout.
-    model.train()
-
     total_loss = 0.
     start_time = time.time()
     ntokens = len(corpus.dictionary)
     
     hidden = model.init_hidden(args.batch_size)
+    
+    model.train()
     for batch, i in enumerate(range(0, train_data.size(0) - 1, args.bptt)):
+
         data, targets = get_batch(args.bptt, train_data, i)
+        
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
         hidden = repackage_hidden(hidden)
@@ -42,13 +65,30 @@ def _train_epoch(args, epoch, model, train_data, corpus, device, lr, criterion):
             total_loss = 0
             start_time = time.time()
 
+            # Log to tensorboard
+            info = {
+                f'training/{epoch}loss/loss': cur_loss,
+                f'training/{epoch}/loss_exp': math.exp(cur_loss),
+                'training/lr' : lr,
+            }
+
+            for tag, value in info.items():
+                inject_summary(summary_writer, tag, value, i)
+
+            summary_writer.flush()
+            
+
 def train(args, model, corpus, device, criterion):
     # At any point you can hit Ctrl + C to break out of training early.
     lr = args.lr
-    best_val_loss = None
+    best_val_loss = None  
 
     train_data = batchify(corpus.train, args.batch_size).to(device)
     valid_data = batchify(corpus.valid, args.batch_size).to(device)
+
+    if not os.path.exists(LOG_FOLDER):
+        print(f'Creatnig folder {LOG_FOLDER}')
+        os.makedirs(LOG_FOLDER)
 
     try:
         for epoch in range(1, args.epochs+1):
@@ -69,6 +109,28 @@ def train(args, model, corpus, device, criterion):
             else:
                 # Anneal the learning rate if no improvement has been seen in the validation dataset.
                 lr /= 4.0
+
+            # Persist after each epoch
+            with open(f"./models/m_{args.type}_{epoch}.pkl", 'wb') as f:
+                torch.save(model, f)
+
+            # Inference a text after each epoch
+            inference_text = inference(args, model, corpus, device)
+            print(f'Generated text: {inference_text}')
+            inject_summary_text(summary_writer, f'Inference_{epoch}', inference_text, epoch)
+
+            # Log to tensorboard
+            info = {
+                'validation/loss/val_loss': val_loss,
+                'validation/loss/val_loss_exp': math.exp(val_loss),
+            }
+
+            for tag, value in info.items():
+                inject_summary(summary_writer, tag, value, epoch)
+
+            summary_writer.flush()
+                
+
     except KeyboardInterrupt:
         print('-' * 89)
         print('Exiting from training early')

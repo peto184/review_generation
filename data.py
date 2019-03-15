@@ -25,7 +25,7 @@ class Corpus(object):
 
         self.use_char_embeds = args.type == 'char' 
         
-        self.train = self.tokenize(os.path.join(args.data, 'train.json'), use_char_embeds=self.use_char_embeds)
+        self.train = self.tokenize(os.path.join(args.data, 'dataset.json'), use_char_embeds=self.use_char_embeds)
         self.valid = self.tokenize(os.path.join(args.data, 'valid.json'), use_char_embeds=self.use_char_embeds)
 
     def tokenize(self, path, use_char_embeds=False):
@@ -34,7 +34,6 @@ class Corpus(object):
         data = load_data(path)
         data = ' '.join(data['reviewText'])
 
-        
         tokens = 0
         if use_char_embeds:
             data = list(data)
